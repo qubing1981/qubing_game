@@ -1,0 +1,868 @@
+<!DOCTYPE html> 
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>翻翻曲冰 文物記憶所</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;background:linear-gradient(135deg,#f7efe1,#e8dcc7);color:#3e2d20;min-height:100vh}
+.wrap{max-width:900px;margin:auto;padding:24px 18px 40px}
+header{text-align:center}
+h1{margin:8px 0 4px;font-size:clamp(28px,5vw,44px)}
+.sub{margin:0 0 18px;color:#765d48}
+.panel{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;align-items:center;margin:14px auto 22px}
+.stat{background:#fffaf2;border:2px solid #d4b990;border-radius:14px;padding:9px 17px;font-weight:700}
+button{font:inherit;cursor:pointer}
+#restart,.level{border:0;border-radius:12px;padding:10px 16px;background:#795548;color:white;font-weight:700}
+.levels{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:18px}
+.level{background:#c5ad8d;color:#3e2d20}
+.level.active{background:#795548;color:white}
+.board{display:grid;gap:12px;max-width:700px;margin:auto}
+.card{aspect-ratio:4/5;border:0;background:none;padding:0;perspective:800px;width:100%;}
+.inner{position:relative;width:100%;height:100%;transition:transform .45s;transform-style:preserve-3d}
+.card.flipped .inner,.card.matched .inner{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;border-radius:15px;display:flex;align-items:center;justify-content:center;box-shadow:0 5px 12px #0002}
+.back{background:#fff;border:0;overflow:hidden}.face img{width:100%;height:100%;object-fit:cover;display:block;border-radius:12px}.front{overflow:hidden}
+.front{
+  transform:rotateY(180deg);
+  background:#fffaf0;
+  border:3px solid #b88f61;
+  overflow:hidden;
+}
+
+.front img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+#message{text-align:center;min-height:34px;margin:18px 0 0;font-size:18px;font-weight:700}
+.overlay{position:fixed;inset:0;background:#24170dcc;display:none;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fffaf2;border-radius:22px;padding:30px;max-width:420px;text-align:center;box-shadow:0 20px 50px #0005}
+.modal h2{font-size:32px;margin:0 0 8px}
+.modal button{margin-top:12px}
+@media(max-width:560px){.wrap{padding-top:12px}.board{gap:8px}.panel{gap:8px}.stat{padding:8px 12px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>🏺 翻翻曲冰 文物記憶所</h1>
+  <p class="sub">翻開牌卡，找出兩張相同的文物！</p>
+</header>
+
+<div class="levels" id="levels">
+  <button class="level active" data-level="1">第一關 · 6張</button>
+  <button class="level" data-level="2">第二關 · 8張</button>
+  <button class="level" data-level="3">第三關 · 12張</button>
+  <button class="level" data-level="4">第四關 · 16張</button>
+</div>
+
+<div class="panel">
+  <div class="stat">⏱ 時間：<span id="time">0</span> 秒</div>
+  <div class="stat">🎯 步數：<span id="moves">0</span></div>
+  <div class="stat">⭐ 配對：<span id="pairs">0</span>/<span id="total">3</span></div>
+  <button id="restart">重新開始</button>
+</div>
+
+<div id="board" class="board"></div>
+<div id="message">記住牌卡位置，開始配對吧！</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2>🎉 闖關成功！</h2>
+    <p id="result"></p>
+    <button id="next" >下一關</button>
+  </div>
+</div>
+
+<script>
+const artifacts = [
+  {
+    name: "帶流口陶缽",
+    images: [
+      "images/card/front/牌卡-帶流口陶缽(1).png",
+      "images/card/front/牌卡-帶流口陶缽(2).png"
+    ]
+  },
+  {
+    name: "玉玦",
+    images: [
+      "images/card/front/牌卡-玉玦(1).png",
+      "images/card/front/牌卡-玉玦(2).png",
+      "images/card/front/牌卡-玉玦(3).png"
+    ]
+  },
+  {
+    name: "玉環",
+    images: [
+      "images/card/front/牌卡-玉環(1).png",
+      "images/card/front/牌卡-玉環(2).png"
+    ]
+  },
+  {
+    name: "矛鏃形器",
+    images: [
+      "images/card/front/牌卡-矛鏃形器(1).png",
+      "images/card/front/牌卡-矛鏃形器(2).png",
+      "images/card/front/牌卡-矛鏃形器(3).png"
+    ]
+  },
+  {
+    name: "石刀",
+    images: [
+      "images/card/front/牌卡-石刀(1).png",
+      "images/card/front/牌卡-石刀(2).png",
+      "images/card/front/牌卡-石刀(3).png"
+    ]
+  },
+  {
+    name: "石斧",
+    images: [
+      "images/card/front/牌卡-石斧(1).png",
+      "images/card/front/牌卡-石斧(2).png"
+    ]
+  },
+  {
+    name: "石矛",
+    images: [
+      "images/card/front/牌卡-石矛(1).png"
+    ]
+  },
+  {
+    name: "石鏃",
+    images: [
+      "images/card/front/牌卡-石鏃(1).png"
+    ]
+  },
+  {
+    name: "網墜",
+    images: [
+      "images/card/front/牌卡-網墜(1).png",
+      "images/card/front/牌卡-網墜(2).png",
+      "images/card/front/牌卡-網墜(3).png",
+      "images/card/front/牌卡-網墜(4).png",
+      "images/card/front/牌卡-網墜(5).png"
+    ]
+  },
+  {
+    name: "錛鑿形器",
+    images: [
+      "images/card/front/牌卡-錛鑿形器(1).png",
+      "images/card/front/牌卡-錛鑿形器(2).png",
+      "images/card/front/牌卡-錛鑿形器(3).png"
+    ]
+  },
+  {
+    name: "陶罐",
+    images: [
+      "images/card/front/牌卡-陶罐(1).png",
+      "images/card/front/牌卡-陶罐(2).png",
+      "images/card/front/牌卡-陶罐(3).png"
+    ]
+  }
+];
+
+
+// ===============================
+// 遊戲設定
+// ===============================
+
+const levelConfig = {
+  1: {
+    cards: 6,
+    pairs: 3,
+    columns: 3
+  },
+  2: {
+    cards: 8,
+    pairs: 4,
+    columns: 4
+  },
+  3: {
+    cards: 12,
+    pairs: 6,
+    columns: 4
+  },
+  4: {
+    cards: 16,
+    pairs: 8,
+    columns: 4
+  }
+};
+
+
+// ===============================
+// DOM
+// ===============================
+
+const board = document.getElementById("board");
+const timeEl = document.getElementById("time");
+const movesEl = document.getElementById("moves");
+const pairsEl = document.getElementById("pairs");
+const totalEl = document.getElementById("total");
+const messageEl = document.getElementById("message");
+
+const restartBtn = document.getElementById("restart");
+const levelButtons = document.querySelectorAll(".level");
+
+const overlay = document.getElementById("overlay");
+const resultEl = document.getElementById("result");
+const nextBtn = document.getElementById("next");
+
+
+// ===============================
+// 遊戲狀態
+// ===============================
+
+let currentLevel = 1;
+
+let firstCard = null;
+let secondCard = null;
+
+let lockBoard = false;
+
+let moves = 0;
+let matchedPairs = 0;
+
+let seconds = 0;
+let timer = null;
+
+let gameStarted = false;
+
+
+// ===============================
+// 隨機排序
+// Fisher-Yates Shuffle
+// ===============================
+
+function shuffle(array) {
+  const arr = [...array];
+
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+
+  return arr;
+}
+
+
+// ===============================
+// 建立牌組
+//
+// 規則：
+// 1. 先抽「種類」
+// 2. 每個種類最多一次
+// 3. 再從該種類內抽一張圖片
+// 4. 該圖片複製成一對
+// ===============================
+
+function createDeck(pairCount) {
+
+  // ==========================================
+  // Step 1：先依「文物種類 name」去重
+  // ==========================================
+  //
+  // 就算 artifacts 裡面有：
+  //
+  // 陶罐
+  // 陶罐
+  //
+  // 也只會保留一個陶罐種類
+  //
+
+  const uniqueArtifacts = [];
+
+  const usedNames = new Set();
+
+  artifacts.forEach(artifact => {
+
+    if (!usedNames.has(artifact.name)) {
+
+      usedNames.add(artifact.name);
+
+      uniqueArtifacts.push(artifact);
+
+    }
+
+  });
+
+
+  // ==========================================
+  // Step 2：隨機打亂「種類」
+  // ==========================================
+
+  const shuffledArtifacts =
+    shuffle(uniqueArtifacts);
+
+
+  // ==========================================
+  // Step 3：先抽出不同的種類
+  // ==========================================
+  //
+  // 例如第四關需要 8 組
+  //
+  // 就先抽：
+  //
+  // 石刀
+  // 陶罐
+  // 玉玦
+  // 網墜
+  // ...
+  //
+  // 每個種類最多一次
+  //
+
+  const selectedArtifacts =
+    shuffledArtifacts.slice(0, pairCount);
+
+
+  // ==========================================
+  // Step 4：每個種類裡面「只抽一張圖片」
+  // ==========================================
+
+  const selectedImages = selectedArtifacts.map(
+    (artifact, index) => {
+
+      const randomIndex =
+        Math.floor(
+          Math.random() * artifact.images.length
+        );
+
+      const selectedImage =
+        artifact.images[randomIndex];
+
+
+      return {
+        id: index,
+
+        // 文物種類
+        name: artifact.name,
+
+        // 該種類抽中的「單一圖片」
+        image: selectedImage
+      };
+
+    }
+  );
+
+
+  // ==========================================
+  // Step 5：每張圖片複製成一對
+  // ==========================================
+  //
+  // 例如抽到：
+  //
+  // 陶罐(2)
+  //
+  // 就一定是：
+  //
+  // 陶罐(2)
+  // 陶罐(2)
+  //
+  // 不會是：
+  //
+  // 陶罐(1)
+  // 陶罐(2)
+  //
+
+  const deck = [];
+
+
+  selectedImages.forEach(item => {
+
+    // 第一張
+    deck.push({
+      id: item.id,
+      name: item.name,
+      image: item.image
+    });
+
+
+    // 第二張
+    deck.push({
+      id: item.id,
+      name: item.name,
+      image: item.image
+    });
+
+  });
+
+
+  // ==========================================
+  // Step 6：最後才把所有牌打亂
+  // ==========================================
+
+  return shuffle(deck);
+}
+
+
+// ===============================
+// 建立牌卡 HTML
+// ===============================
+
+function createCard(item) {
+
+  const card = document.createElement("button");
+
+  card.className = "card";
+
+  // 用 id 判斷配對
+  card.dataset.id = item.id;
+
+  card.dataset.name = item.name;
+
+  card.innerHTML = `
+    <div class="inner">
+
+      <div class="face back">
+        <img
+          src="images/card/背面.png"
+          alt="牌卡背面"
+        >
+      </div>
+
+      <div class="face front">
+        <img
+          src="${item.image}"
+          alt="${item.name}"
+        >
+      </div>
+
+    </div>
+  `;
+
+
+  card.addEventListener("click", () => {
+
+    flipCard(card);
+
+  });
+
+
+  return card;
+}
+
+
+// ===============================
+// 開始遊戲
+// ===============================
+
+function startGame(level = currentLevel) {
+
+  currentLevel = level;
+
+  const config = levelConfig[currentLevel];
+
+
+  // 重置狀態
+  firstCard = null;
+  secondCard = null;
+
+  lockBoard = false;
+
+  moves = 0;
+  matchedPairs = 0;
+
+  seconds = 0;
+
+  gameStarted = false;
+
+
+  // 停止舊計時器
+  stopTimer();
+
+
+  // 更新 UI
+  timeEl.textContent = "0";
+  movesEl.textContent = "0";
+  pairsEl.textContent = "0";
+  totalEl.textContent = config.pairs;
+
+  messageEl.textContent =
+    "記住牌卡位置，開始配對吧！";
+
+
+  // 關閉成功視窗
+  overlay.style.display = "none";
+
+
+  // 清空牌桌
+  board.innerHTML = "";
+
+
+  // 設定欄數
+  board.style.gridTemplateColumns =
+    `repeat(${config.columns}, 1fr)`;
+
+
+  // 建立牌組
+  const deck = createDeck(config.pairs);
+
+
+  // 放入牌桌
+  deck.forEach(item => {
+
+    const card = createCard(item);
+
+    board.appendChild(card);
+
+  });
+
+
+  // 更新 Level 按鈕
+  levelButtons.forEach(button => {
+
+    const buttonLevel =
+      Number(button.dataset.level);
+
+    button.classList.toggle(
+      "active",
+      buttonLevel === currentLevel
+    );
+
+  });
+
+}
+
+
+// ===============================
+// 翻牌
+// ===============================
+
+function flipCard(card) {
+
+  // 鎖定時不能操作
+  if (lockBoard) {
+    return;
+  }
+
+
+  // 已翻開不能再點
+  if (card.classList.contains("flipped")) {
+    return;
+  }
+
+
+  // 已配對不能再點
+  if (card.classList.contains("matched")) {
+    return;
+  }
+
+
+  // 第一次翻牌
+  if (!firstCard) {
+
+    firstCard = card;
+
+    card.classList.add("flipped");
+
+
+    // 第一次操作才開始計時
+    if (!gameStarted) {
+
+      gameStarted = true;
+
+      startTimer();
+
+    }
+
+
+    return;
+  }
+
+
+  // 第二次翻牌
+  secondCard = card;
+
+  card.classList.add("flipped");
+
+
+  // 步數 +1
+  moves++;
+
+  movesEl.textContent = moves;
+
+
+  // 暫停操作
+  lockBoard = true;
+
+
+  // 檢查是否配對
+  checkMatch();
+
+}
+
+
+// ===============================
+// 判斷配對
+// ===============================
+
+function checkMatch() {
+
+  /*
+   * 非常重要：
+   *
+   * dataset.id 相同
+   * 才算配對成功。
+   *
+   * 因為 createDeck() 裡：
+   *
+   * 同一張圖片會得到相同 id
+   *
+   * 例如：
+   *
+   * 石刀(1) → id = 0
+   * 石刀(1) → id = 0
+   *
+   * 成功
+   *
+   * 但：
+   *
+   * 石刀(1) → id = 0
+   * 石刀(2) → id = 1
+   *
+   * 失敗
+   */
+
+
+  const isMatch =
+    firstCard.dataset.id ===
+    secondCard.dataset.id;
+
+
+  if (isMatch) {
+
+    handleMatch();
+
+  } else {
+
+    handleMismatch();
+
+  }
+
+}
+
+
+// ===============================
+// 配對成功
+// ===============================
+
+function handleMatch() {
+
+  firstCard.classList.add("matched");
+  secondCard.classList.add("matched");
+
+
+  matchedPairs++;
+
+  pairsEl.textContent = matchedPairs;
+
+
+  messageEl.textContent =
+    "🎉 配對成功！";
+
+
+  resetTurn();
+
+
+  // 判斷是否全部完成
+  const totalPairs =
+    levelConfig[currentLevel].pairs;
+
+
+  if (matchedPairs === totalPairs) {
+
+    gameComplete();
+
+  }
+
+}
+
+
+// ===============================
+// 配對失敗
+// ===============================
+
+function handleMismatch() {
+
+  messageEl.textContent =
+    "❌ 不一樣，再試一次！";
+
+
+  setTimeout(() => {
+
+    firstCard.classList.remove("flipped");
+    secondCard.classList.remove("flipped");
+
+
+    resetTurn();
+
+    messageEl.textContent =
+      "記住牌卡位置，繼續配對吧！";
+
+  }, 900);
+
+}
+
+
+// ===============================
+// 重置這一回合
+// ===============================
+
+function resetTurn() {
+
+  firstCard = null;
+  secondCard = null;
+
+  lockBoard = false;
+
+}
+
+
+// ===============================
+// 計時器
+// ===============================
+
+function startTimer() {
+
+  stopTimer();
+
+
+  timer = setInterval(() => {
+
+    seconds++;
+
+    timeEl.textContent = seconds;
+
+  }, 1000);
+
+}
+
+
+function stopTimer() {
+
+  if (timer !== null) {
+
+    clearInterval(timer);
+
+    timer = null;
+
+  }
+
+}
+
+
+// ===============================
+// 遊戲完成
+// ===============================
+
+function gameComplete() {
+
+  stopTimer();
+
+  lockBoard = true;
+
+
+  const totalPairs =
+    levelConfig[currentLevel].pairs;
+
+
+  resultEl.textContent =
+    `第 ${currentLevel} 關完成！` +
+    `\n共用了 ${moves} 步，` +
+    `花費 ${seconds} 秒完成 ${totalPairs} 組配對。`;
+
+
+  // 最後一關
+  if (currentLevel === 4) {
+
+    nextBtn.textContent = "重新挑戰";
+
+  } else {
+
+    nextBtn.textContent = "下一關";
+
+  }
+
+
+  setTimeout(() => {
+
+    overlay.style.display = "flex";
+
+  }, 500);
+
+}
+
+
+// ===============================
+// Level 按鈕
+// ===============================
+
+levelButtons.forEach(button => {
+
+  button.addEventListener("click", () => {
+
+    const level =
+      Number(button.dataset.level);
+
+
+    if (!levelConfig[level]) {
+      return;
+    }
+
+
+    startGame(level);
+
+  });
+
+});
+
+
+// ===============================
+// 重新開始
+// ===============================
+
+restartBtn.addEventListener("click", () => {
+
+  startGame(currentLevel);
+
+});
+
+
+// ===============================
+// 下一關
+// ===============================
+
+nextBtn.addEventListener("click", () => {
+
+  if (currentLevel < 4) {
+
+    startGame(currentLevel + 1);
+
+  } else {
+
+    // 第四關完成後重新挑戰第四關
+    startGame(4);
+
+  }
+
+});
+
+
+// ===============================
+// 第一次載入
+// ===============================
+
+startGame(1);
+</script>
+</body>
+</html>
+startGame(1);
+</script>
+</body>
+</html>
